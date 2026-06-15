@@ -1835,7 +1835,14 @@ async function deleteProject(id){
   return true;
 }
 async function updateProfileDB(id, patch){
-  const {error} = await sb.from('profiles').update(patch).eq('id', id);
+  let {error} = await sb.from('profiles').update(patch).eq('id', id);
+  // Če stolpec project_ids še ne obstaja (SQL migracija še ni pognana),
+  // ne pokvari shranjevanja — poskusi še enkrat brez njega.
+  if(error && /project_ids/i.test(error.message||'') && ('project_ids' in patch)){
+    const {project_ids, ...rest} = patch;
+    ({error} = await sb.from('profiles').update(rest).eq('id', id));
+    if(!error) toast('Shranjeno (dodelitev projektov ni aktivna — zaženi SQL migracijo)','info');
+  }
   if(error){toast('Napaka: '+error.message,'error'); return false}
   const p = allProfiles.find(x=>x.id===id);
   if(p) Object.assign(p, patch);
